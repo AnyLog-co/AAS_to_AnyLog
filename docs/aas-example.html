@@ -1,0 +1,1632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>AAS shells</title>
+  <style>
+    body { margin: 0; background: #f7f5f2; color: #222; font: 18px/1.4 system-ui, sans-serif; }
+    main { margin: 24px 0 64px 24px; padding: 0; }
+    h1 { font-size: 20px; font-weight: 600; margin: 0 0 8px; }
+    h2 { font-size: 42px; font-weight: 700; margin: 64px 0 16px; }
+    h3 { font-size: 28px; font-weight: 700; margin: 36px 0 12px; color: #111; }
+    p { margin: 0 0 12px; color: #555; }
+    .note { margin: 0 0 36px; max-width: calc(100vw - 48px); }
+    .note p:last-child { margin-bottom: 0; }
+    pre.obj { background: #efe6f6; border-color: #c4a8d4; }
+    .shell > pre.tree { margin: 8px 0 0; padding: 8px 10px; }
+    img { display: block; max-width: min(1100px, calc(100vw - 48px)); margin: 0 0 16px; border: 1px solid #ddd; }
+    pre b { font-weight: 700; }
+    a { color: #111; }
+    .box { border: 1px solid #ddd; background: #fff; padding: 16px 18px; }
+    .shell { position: relative; margin: 0 0 18px; width: max-content; min-width: 640px; max-width: min(1100px, calc(100vw - 80px)); }
+    .shell.d0 { background: #f4efe4; border-color: #c9b89a; border-left: 6px solid #c9b89a; }
+    .shell.d1 { background: #e7f0e4; border-color: #9fbf96; border-left: 6px solid #9fbf96; }
+    .shell.d2 { background: #e6eef6; border-color: #9bb4d0; border-left: 6px solid #9bb4d0; }
+    .shell.d3 { background: #f7f0dc; border-color: #d4c07a; border-left: 6px solid #d4c07a; }
+    .shell.d4 { background: #f8ebe4; border-color: #e0b197; border-left: 6px solid #e0b197; }
+    .shell.d5 { background: #efe6f6; border-color: #c4a8d4; border-left: 6px solid #c4a8d4; }
+    .shell.elbow::before,
+    .shell.tee::before {
+      content: "";
+      position: absolute;
+      left: -36px;
+      width: 2px;
+      background: #444;
+    }
+    .shell.elbow::before { top: -18px; height: 46px; }
+    .shell.tee::before { top: -18px; bottom: -18px; }
+    .shell.elbow::after,
+    .shell.tee::after {
+      content: "";
+      position: absolute;
+      left: -36px;
+      top: 28px;
+      width: 36px;
+      border-top: 2px solid #444;
+    }
+    .shell > i.v {
+      position: absolute;
+      top: -18px;
+      bottom: -18px;
+      width: 2px;
+      background: #444;
+      pointer-events: none;
+    }
+    .d4.p3 > i.v { left: -108px; }
+    .d5.p3 > i.v { left: -180px; }
+    .d5.p4 > i.v { left: -108px; }
+    .d5.p34 > i.v { left: -108px; box-shadow: -72px 0 0 #444; }
+    .d1 { margin-left: 72px; }
+    .d2 { margin-left: 144px; }
+    .d3 { margin-left: 216px; }
+    .d4 { margin-left: 288px; }
+    .d5 { margin-left: 360px; }
+    .kind { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #888; }
+    .title { font-size: 22px; margin-top: 2px; }
+    .spec { margin-top: 6px; color: #222; font-size: 16px; }
+    .uns { margin-top: 6px; color: #111; font-size: 17px; }
+    .uns .path { font-weight: 600; }
+    .get { margin-top: 6px; color: #111; font: 14px/1.45 ui-monospace, monospace; overflow-wrap: anywhere; }
+    .nouns { margin-top: 6px; color: #111; font-size: 17px; font-weight: 600; }
+    .sub { margin: 16px 0 0 24px; }
+    .inner { margin: 12px 0 0 24px; }
+    .group { margin: 12px 0 0; font-weight: 600; }
+    ul { margin: 8px 0 0; padding: 0; list-style: none; }
+    li { padding: 3px 0; }
+    li b { font-weight: 600; }
+    nav { position: sticky; top: 0; z-index: 2; display: flex; gap: 28px; padding: 14px 24px; background: #fff; border-bottom: 1px solid #ddd; }
+    nav a { color: #111; font-weight: 650; text-decoration: none; }
+    h1, h2, h3, p[id] { scroll-margin-top: 72px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="#aas">AAS</a>
+    <a href="#relations">Relations</a>
+    <a href="#integration">Integration</a>
+    <a href="#data-ingestion">DataIngestion</a>
+    <a href="#example-uns">Example UNS</a>
+    <a href="#graphs">Data Graphs</a>
+  </nav>
+  <main>
+    <h1 id="aas">Shells in the AAS</h1>
+    <div class="note">
+      <p>Download and run the <a href="https://hub.docker.com/r/eclipsebasyx/aas-environment">Eclipse BaSyx</a> container. It listens on <a href="http://127.0.0.1:8081">http://127.0.0.1:8081</a>.</p>
+      <pre>docker pull eclipsebasyx/aas-environment:2.0.0-SNAPSHOT
+docker run -d --name aas-env -p 8081:8081 eclipsebasyx/aas-environment:2.0.0-SNAPSHOT</pre>
+      <p>Two GET calls. The id in the second path is the submodel id as base64url, with the padding removed. This one is <b>chem:company:hierarchy</b>.</p>
+      <pre>GET http://127.0.0.1:8081/shells
+GET http://127.0.0.1:8081/submodels/Y2hlbTpjb21wYW55OmhpZXJhcmNoeQ</pre>
+      <p>A shell contains submodels. A submodel contains properties.</p>
+    </div>
+    
+    <section class="box shell d0" id="chem:company">
+      <div class="kind">Shell</div>
+      <div class="title">Chemblast</div>
+      <div class="spec"><b>displayName</b> Chemblast</div>
+      <div class="spec"><b>description</b> Company CHEMBLAST.Co has part plant PLANT1.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast</span></div>
+      <pre class="tree">chemblast</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTpjb21wYW55</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">HierarchicalStructures</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTpjb21wYW55OmhpZXJhcmNoeQ</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ArcheType</b> OneDown</li></ul><ul><li><b>HasPart</b> PLANT1</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d1 elbow" id="chem:plant1">
+      <div class="kind">Shell</div>
+      <div class="title">PLANT1</div>
+      <div class="spec"><b>displayName</b> PLANT1</div>
+      <div class="spec"><b>description</b> Plant PLANT1 has part the reaction line.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1</span></div>
+      <pre class="tree">chemblast
+ └── plant1</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTpwbGFudDE</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">HierarchicalStructures</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTpwbGFudDE6aGllcmFyY2h5</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ArcheType</b> OneDown</li></ul><ul><li><b>HasPart</b> Reaction</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d2 elbow" id="chem:reaction">
+      <div class="kind">Shell</div>
+      <div class="title">Reaction</div>
+      <div class="spec"><b>displayName</b> Reaction</div>
+      <div class="spec"><b>description</b> Reaction line has part cell 1 and cell 2.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTpyZWFjdGlvbg</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">HierarchicalStructures</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTpyZWFjdGlvbjpoaWVyYXJjaHk</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ArcheType</b> OneDown</li></ul><ul><li><b>HasPart</b> Cell1</li><li><b>HasPart</b> Cell2</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d3 tee" id="chem:cell1">
+      <div class="kind">Shell</div>
+      <div class="title">Cell1</div>
+      <div class="spec"><b>displayName</b> Cell1</div>
+      <div class="spec"><b>description</b> Cell 1 has part the evaporator, the fan motor, and the conveyor.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction
+           └── cell1</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTpjZWxsMQ</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">HierarchicalStructures</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTpjZWxsMTpoaWVyYXJjaHk</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ArcheType</b> OneDown</li></ul><ul><li><b>HasPart</b> Evaporator</li><li><b>HasPart</b> Motor</li><li><b>HasPart</b> Conveyor</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d4 tee p3" id="chem:evaporator">
+      <i class="v"></i>
+      <div class="kind">Shell</div>
+      <div class="title">Evaporator</div>
+      <div class="spec"><b>displayName</b> Evaporator</div>
+      <div class="spec"><b>description</b> Evaporator device has part coil E2LA0140BKR1.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/evaporator</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction
+           └── cell1
+                └── evaporator</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTpldmFwb3JhdG9y</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">HierarchicalStructures</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTpldmFwb3JhdG9yOmhpZXJhcmNoeQ</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ArcheType</b> OneDown</li></ul><ul><li><b>HasPart</b> E2LA0140BKR1</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d5 elbow p34" id="chem:e2la0140bkr1">
+      <i class="v"></i>
+      <div class="kind">Shell</div>
+      <div class="title">E2LA0140BKR1</div>
+      <div class="spec"><b>displayName</b> E2LA0140BKR1</div>
+      <div class="spec"><b>description</b> Split-Pak evaporator coil. Model is decoded from the Master-Bilt evaporator coil model-number guide. Serial stays NL204190709.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/evaporator/e2la0140bkr1</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction
+           └── cell1
+                └── evaporator
+                     └── e2la0140bkr1
+                          ├── temperature
+                          └── state</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTplMmxhMDE0MGJrcjE</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">DigitalNameplate</div>
+          <div class="nouns">does not result in a UNS. It names the machine. It is not a signal.</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTplMmxhMDE0MGJrcjE6bmFtZXBsYXRl</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>URIOfTheProduct</b> https://www.master-bilt.com/E2LA0140BKR1/NL204190709</li><li><b>ManufacturerName</b> Master-Bilt</li><li><b>ManufacturerProductRoot</b> Split-Pak</li><li><b>ManufacturerProductFamily</b> Evaporator Coil</li><li><b>ManufacturerProductType</b> E2 Medium Profile</li><li><b>ManufacturerProductDesignation</b> E2LA0140BKR1</li><li><b>OrderCodeOfManufacturer</b> E2LA0140BKR1</li><li><b>ProductArticleNumberOfManufacturer</b> E2LA0140BKR1</li><li><b>SerialNumber</b> NL204190709</li><li><b>YearOfConstruction</b> 2024</li><li><b>CountryOfOrigin</b> US</li><li><b>AssetClass</b> RefrigerationUnit</li><li><b>ModelDecode</b> E2 medium profile 6 FPI; L low temp 0F to -30F; A R-454A; 0140 = 14000 BTUH; B 208-230/60/1; K KE2 controller; R reverse-cycle defrost; 1 TXV and temp control mounted</li></ul>
+          </div>
+        </section>
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">OperationalData</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTplMmxhMDE0MGJrcjE6b3BlcmF0aW9uYWwtZGF0YQ</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            
+            <section class="box sub">
+              <div class="title">Temperature</div>
+              <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/evaporator/e2la0140bkr1/temperature</span></div>
+              <ul><li><b>OpcUaNodeId</b> ns=2;s=Controller1.Path1.Execution.Temperature</li><li><b>SemanticMeaning</b> EvaporatorTemperature</li><li><b>semanticId</b> http://qudt.org/vocab/quantitykind/Temperature</li><li><b>ValueType</b> xs:double</li><li><b>Unit</b> degreeCelsius</li><li><b>ManufacturerName</b> Master-Bilt</li><li><b>ManufacturerProductDesignation</b> E2LA0140BKR1</li><li><b>SerialNumber</b> NL204190709</li></ul>
+            </section>
+            <section class="box sub">
+              <div class="title">State</div>
+              <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/evaporator/e2la0140bkr1/state</span></div>
+              <ul><li><b>OpcUaNodeId</b> ns=2;s=Controller1.Path1.Execution.State</li><li><b>SemanticMeaning</b> ExecutionState</li><li><b>ValueType</b> xs:string</li><li><b>ValueList</b> Running,Stopped,Defrost,Alarm</li><li><b>ManufacturerName</b> Master-Bilt</li><li><b>ManufacturerProductDesignation</b> E2LA0140BKR1</li><li><b>SerialNumber</b> NL204190709</li></ul>
+            </section>
+          </div>
+        </section>
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">Interface_OPCUA</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTplMmxhMDE0MGJrcjE6b3BjdWE</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>supplementalSemanticId</b> http://opcfoundation.org/UA/WoT-Binding/</li><li><b>ip</b> 10.0.0.111</li><li><b>port</b> 53530</li><li><b>base</b> opc.tcp://10.0.0.111:53530/</li><li><b>href</b> /?id=ns=2;s=Controller1.Path1.Execution.Temperature</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d4 tee p3" id="chem:motor">
+      <i class="v"></i>
+      <div class="kind">Shell</div>
+      <div class="title">Motor</div>
+      <div class="spec"><b>displayName</b> Motor</div>
+      <div class="spec"><b>description</b> Motor device has part fan motor ECM1420.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/motor</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction
+           └── cell1
+                └── motor</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTptb3Rvcg</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">HierarchicalStructures</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTptb3RvcjpoaWVyYXJjaHk</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ArcheType</b> OneDown</li></ul><ul><li><b>HasPart</b> ECM1420</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d5 elbow p34" id="chem:ecm1420">
+      <i class="v"></i>
+      <div class="kind">Shell</div>
+      <div class="title">ECM1420</div>
+      <div class="spec"><b>displayName</b> ECM1420</div>
+      <div class="spec"><b>description</b> Fan motor ECM1420.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/motor/ecm1420</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction
+           └── cell1
+                └── motor
+                     └── ecm1420
+                          ├── speed
+                          ├── voltage_l1
+                          ├── current_l1
+                          └── active_power_kw</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTplY20xNDIw</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">Nameplate</div>
+          <div class="nouns">does not result in a UNS. It names the machine. It is not a signal.</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTplY20xNDIwOm5hbWVwbGF0ZQ</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ManufacturerName</b> Master-Bilt</li><li><b>ManufacturerProductDesignation</b> ECM1420</li><li><b>SerialNumber</b> MS204190710</li><li><b>AssetClass</b> Motor</li></ul>
+          </div>
+        </section>
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">OperationalData</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTplY20xNDIwOm9wZXJhdGlvbmFsLWRhdGE</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            
+            <section class="box sub">
+              <div class="title">Speed</div>
+              <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/motor/ecm1420/speed</span></div>
+              <ul><li><b>Dnp3Type</b> Analog</li><li><b>Dnp3Index</b> 30</li><li><b>SemanticMeaning</b> MotorSpeed</li><li><b>semanticId</b> http://qudt.org/vocab/quantitykind/AngularVelocity</li><li><b>ValueType</b> xs:double</li><li><b>Unit</b> rpm</li><li><b>ManufacturerName</b> Master-Bilt</li><li><b>ManufacturerProductDesignation</b> ECM1420</li><li><b>SerialNumber</b> MS204190710</li></ul>
+            </section>
+            <section class="box sub">
+              <div class="title">voltage_l1</div>
+              <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/motor/ecm1420/voltage_l1</span></div>
+              <ul><li><b>Dnp3Type</b> Analog</li><li><b>Dnp3Index</b> 0</li><li><b>SemanticMeaning</b> VoltageL1</li><li><b>semanticId</b> http://qudt.org/vocab/quantitykind/Voltage</li><li><b>ValueType</b> xs:double</li><li><b>Unit</b> V</li></ul>
+            </section>
+            <section class="box sub">
+              <div class="title">current_l1</div>
+              <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/motor/ecm1420/current_l1</span></div>
+              <ul><li><b>Dnp3Type</b> Analog</li><li><b>Dnp3Index</b> 1</li><li><b>SemanticMeaning</b> CurrentL1</li><li><b>semanticId</b> http://qudt.org/vocab/quantitykind/ElectricCurrent</li><li><b>ValueType</b> xs:double</li><li><b>Unit</b> A</li></ul>
+            </section>
+            <section class="box sub">
+              <div class="title">active_power_kw</div>
+              <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/motor/ecm1420/active_power_kw</span></div>
+              <ul><li><b>Dnp3Type</b> Analog</li><li><b>Dnp3Index</b> 6</li><li><b>SemanticMeaning</b> ActivePower</li><li><b>semanticId</b> http://qudt.org/vocab/quantitykind/ActivePower</li><li><b>ValueType</b> xs:double</li><li><b>Unit</b> kW</li></ul>
+            </section>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d4 elbow p3" id="chem:conveyor">
+      <i class="v"></i>
+      <div class="kind">Shell</div>
+      <div class="title">Conveyor</div>
+      <div class="spec"><b>displayName</b> Conveyor</div>
+      <div class="spec"><b>description</b> Conveyor device has part conveyor CV-001.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/conveyor</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction
+           └── cell1
+                └── conveyor</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTpjb252ZXlvcg</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">HierarchicalStructures</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTpjb252ZXlvcjpoaWVyYXJjaHk</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ArcheType</b> OneDown</li></ul><ul><li><b>HasPart</b> CV-001</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d5 elbow p3" id="chem:cv-001">
+      <i class="v"></i>
+      <div class="kind">Shell</div>
+      <div class="title">CV-001</div>
+      <div class="spec"><b>displayName</b> CV-001</div>
+      <div class="spec"><b>description</b> Conveyor CV-001.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/conveyor/cv-001</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction
+           └── cell1
+                └── conveyor
+                     └── cv-001
+                          ├── running
+                          ├── speed
+                          └── direction</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTpjdi0wMDE</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">Nameplate</div>
+          <div class="nouns">does not result in a UNS. It names the machine. It is not a signal.</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTpjdi0wMDE6bmFtZXBsYXRl</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ManufacturerName</b> Hartwell</li><li><b>ManufacturerProductDesignation</b> CV-001</li><li><b>SerialNumber</b> CV204190711</li><li><b>AssetClass</b> Conveyor</li></ul>
+          </div>
+        </section>
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">OperationalData</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTpjdi0wMDE6b3BlcmF0aW9uYWwtZGF0YQ</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <section class="box sub">
+              <div class="title">Running</div>
+              <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/conveyor/cv-001/running</span></div>
+              <ul><li><b>SemanticMeaning</b> Running</li><li><b>Value</b> false</li></ul>
+            </section>
+            <section class="box sub">
+              <div class="title">Speed</div>
+              <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/conveyor/cv-001/speed</span></div>
+              <ul><li><b>SemanticMeaning</b> Speed</li><li><b>semanticId</b> http://qudt.org/vocab/quantitykind/Speed</li><li><b>Value</b> 50</li></ul>
+            </section>
+            <section class="box sub">
+              <div class="title">Direction</div>
+              <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell1/conveyor/cv-001/direction</span></div>
+              <ul><li><b>SemanticMeaning</b> Direction</li><li><b>Value</b> x</li></ul>
+            </section>
+          </div>
+        </section>
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">PlcCommunication</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTpjdi0wMDE6cGxjLWNvbW11bmljYXRpb24</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <div class='group'>PlcNode1</div><ul><li><b>PlcOpcUaServerEndpoint</b> opc.tcp://192.168.88.236:48120</li><li><b>PlcOpcUaServerNodeId</b> ns=4;i=2</li><li><b>PlcOpcUaInterface</b> OpcUaServerInterface</li><li><b>AasProperty</b> Running</li><li><b>PlcTag</b> dop3</li><li><b>IsSensor</b> false</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d3 elbow" id="chem:cell2">
+      <div class="kind">Shell</div>
+      <div class="title">Cell2</div>
+      <div class="spec"><b>displayName</b> Cell2</div>
+      <div class="spec"><b>description</b> Cell 2 has part temperature transmitter 2TT-004 and valve FCV-C1.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell2</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction
+           └── cell2</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTpjZWxsMg</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">HierarchicalStructures</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTpjZWxsMjpoaWVyYXJjaHk</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ArcheType</b> OneDown</li></ul><ul><li><b>HasPart</b> Transmitter</li><li><b>HasPart</b> Valve</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d4 tee" id="chem:transmitter">
+      <div class="kind">Shell</div>
+      <div class="title">Transmitter</div>
+      <div class="spec"><b>displayName</b> Transmitter</div>
+      <div class="spec"><b>description</b> Temperature transmitter 2TT-004.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell2/transmitter</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction
+           └── cell2
+                └── transmitter</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTp0cmFuc21pdHRlcg</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">HierarchicalStructures</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTp0cmFuc21pdHRlcjpoaWVyYXJjaHk</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ArcheType</b> OneDown</li></ul><ul><li><b>HasPart</b> 2TT-004</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d5 elbow p4" id="chem:2tt-004">
+      <i class="v"></i>
+      <div class="kind">Shell</div>
+      <div class="title">2TT-004</div>
+      <div class="spec"><b>displayName</b> 2TT-004</div>
+      <div class="spec"><b>description</b> Temperature transmitter 2TT-004.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell2/transmitter/2tt-004</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction
+           └── cell2
+                └── transmitter
+                     └── 2tt-004
+                          ├── temperature
+                          └── limit</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbToydHQtMDA0</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">Nameplate</div>
+          <div class="nouns">does not result in a UNS. It names the machine. It is not a signal.</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbToydHQtMDA0Om5hbWVwbGF0ZQ</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ManufacturerName</b> Hartwell</li><li><b>ManufacturerProductDesignation</b> 2TT-004</li><li><b>SerialNumber</b> TT204190712</li><li><b>AssetClass</b> Transmitter</li></ul>
+          </div>
+        </section>
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">Temperature</div>
+          <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell2/transmitter/2tt-004/temperature</span></div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbToydHQtMDA0OnRlbXBlcmF0dXJl</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>InstanceID</b> -2491777560834407683</li><li><b>Path</b> APP1_MadePC200_UNIT_202_EM_D204_EM_D204_FieldInterface.AI_2TT004.IThis.AIFiltered</li><li><b>DataObjectName</b> 2TT-004</li><li><b>DataObjectField</b> Value</li><li><b>ProcessCell</b> PC200</li><li><b>Unit</b> UNIT-202</li><li><b>EquipmentModule</b> EM-D204</li><li><b>VariableType</b> xs:double</li><li><b>TableName</b> RealValues</li><li><b>SemanticMeaning</b> Temperature</li><li><b>semanticId</b> http://qudt.org/vocab/quantitykind/Temperature</li><li><b>PhysicalProperty</b> Temperature</li><li><b>display_tag</b> 2TT-004</li><li><b>display_field</b> Value</li><li><b>unit_code</b> UNIT-202</li></ul>
+          </div>
+        </section>
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">Limit</div>
+          <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell2/transmitter/2tt-004/limit</span></div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbToydHQtMDA0OmxpbWl0</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>InstanceID</b> 1136593117496998821</li><li><b>DataObjectName</b> 2TT-004</li><li><b>DataObjectField</b> LimitH</li><li><b>ProcessCell</b> PC200</li><li><b>Unit</b> UNIT-202</li><li><b>EquipmentModule</b> EM-D204</li><li><b>VariableType</b> xs:boolean</li><li><b>TableName</b> BoolValues</li><li><b>SemanticMeaning</b> Temperature</li><li><b>PhysicalProperty</b> Temperature</li><li><b>display_tag</b> 2TT-004</li><li><b>display_field</b> LimitH</li><li><b>unit_code</b> UNIT-202</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d4 elbow" id="chem:valve">
+      <div class="kind">Shell</div>
+      <div class="title">Valve</div>
+      <div class="spec"><b>displayName</b> Valve</div>
+      <div class="spec"><b>description</b> Control valve FCV-C1.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell2/valve</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction
+           └── cell2
+                └── valve</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTp2YWx2ZQ</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">HierarchicalStructures</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTp2YWx2ZTpoaWVyYXJjaHk</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ArcheType</b> OneDown</li></ul><ul><li><b>HasPart</b> FCV-C1</li></ul>
+          </div>
+        </section>
+    </section>
+    <section class="box shell d5 elbow" id="chem:fcv-c1">
+      <div class="kind">Shell</div>
+      <div class="title">FCV-C1</div>
+      <div class="spec"><b>displayName</b> FCV-C1</div>
+      <div class="spec"><b>description</b> Control valve FCV-C1.</div>
+      <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell2/valve/fcv-c1</span></div>
+      <pre class="tree">chemblast
+ └── plant1
+      └── reaction
+           └── cell2
+                └── valve
+                     └── fcv-c1
+                          └── position</pre>
+      <div class="get">GET http://127.0.0.1:8081/shells/Y2hlbTpmY3YtYzE</div>
+      
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">Nameplate</div>
+          <div class="nouns">does not result in a UNS. It names the machine. It is not a signal.</div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTpmY3YtYzE6bmFtZXBsYXRl</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>ManufacturerName</b> Hartwell</li><li><b>ManufacturerProductDesignation</b> FCV-C1</li><li><b>SerialNumber</b> FV204190713</li><li><b>AssetClass</b> Valve</li></ul>
+          </div>
+        </section>
+        <section class="box sub">
+          <div class="kind">Submodel</div>
+          <div class="title">Position</div>
+          <div class="uns">UNS <span class="path">AAS/chemblast/plant1/reaction/cell2/valve/fcv-c1/position</span></div>
+          <div class="get">GET http://127.0.0.1:8081/submodels/Y2hlbTpmY3YtYzE6cG9zaXRpb24</div>
+          <div class="box inner">
+            <div class="kind">Properties</div>
+            <ul><li><b>InstanceID</b> -135652022502290424</li><li><b>Path</b> APP1_MadePC600_UNIT_601_EM_C1_FCVC1.Fieldinterface.PosSP.IThis.AOScaled</li><li><b>DataObjectName</b> FCV-C1</li><li><b>DataObjectField</b> InternalAO-PosSP</li><li><b>ProcessCell</b> PC600</li><li><b>Unit</b> UNIT-601</li><li><b>EquipmentModule</b> EM-C1</li><li><b>VariableType</b> xs:double</li><li><b>TableName</b> RealValues</li><li><b>SemanticMeaning</b> ValvePosition</li><li><b>PhysicalProperty</b> ValvePosition</li><li><b>display_tag</b> FCV-C1</li><li><b>display_field</b> InternalAO-PosSP</li><li><b>unit_code</b> UNIT-601</li></ul>
+          </div>
+        </section>
+    </section>
+
+    <h2 id="relations">AAS relations to UNS (Python application, fetching data from AAS)</h2>
+    <pre>chemblast
+ └── plant1
+      └── reaction
+           ├── cell1
+           │    ├── evaporator
+           │    │    └── e2la0140bkr1
+           │    │         ├── temperature
+           │    │         └── state
+           │    ├── motor
+           │    │    └── ecm1420
+           │    │         ├── speed
+           │    │         ├── voltage_l1
+           │    │         ├── current_l1
+           │    │         └── active_power_kw
+           │    └── conveyor
+           │         └── cv-001
+           │              ├── running
+           │              ├── speed
+           │              └── direction
+           └── cell2
+                ├── transmitter
+                │    └── 2tt-004
+                │         ├── temperature
+                │         └── limit
+                └── valve
+                     └── fcv-c1
+                          └── position</pre>
+
+    <h2 id="integration">AnyLog integration (Python application, fetching data from AAS)</h2>
+    <div class="note">
+      <p>Each entry is one object with all the semantic informations.<br>
+      A signal gets its own table in the env_sensor database.<br>
+      First choice: the table name is the last three parts of the path.<br>
+      Position is valve/fcv-c1/position, so the table is valve_fcv_c1_position.</p>
+      <pre>[
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;chemblast&quot;,
+      &quot;description&quot;: &quot;Chemblast&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;chemblast&quot;,
+      &quot;namespace&quot;: &quot;chemblast&quot;,
+      &quot;uns_level&quot;: &quot;enterprise&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;plant1&quot;,
+      &quot;description&quot;: &quot;PLANT1&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;plant1&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1&quot;,
+      &quot;uns_level&quot;: &quot;plant&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;reaction&quot;,
+      &quot;description&quot;: &quot;Reaction&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;reaction&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction&quot;,
+      &quot;uns_level&quot;: &quot;line&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;cell1&quot;,
+      &quot;description&quot;: &quot;Cell1&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;cell1&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1&quot;,
+      &quot;uns_level&quot;: &quot;cell&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;evaporator&quot;,
+      &quot;description&quot;: &quot;Evaporator&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;evaporator&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/evaporator&quot;,
+      &quot;uns_level&quot;: &quot;machine&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;E2LA0140BKR1&quot;,
+      &quot;description&quot;: &quot;Master-Bilt Split-Pak evaporator coil E2LA0140BKR1&quot;,
+      &quot;manufacturer&quot;: &quot;Master-Bilt&quot;,
+      &quot;product_root&quot;: &quot;Split-Pak&quot;,
+      &quot;product_family&quot;: &quot;Evaporator Coil&quot;,
+      &quot;product_type&quot;: &quot;E2 Medium Profile&quot;,
+      &quot;model&quot;: &quot;E2LA0140BKR1&quot;,
+      &quot;product&quot;: &quot;E2LA0140BKR1&quot;,
+      &quot;order_code&quot;: &quot;E2LA0140BKR1&quot;,
+      &quot;serial&quot;: &quot;NL204190709&quot;,
+      &quot;asset_class&quot;: &quot;RefrigerationUnit&quot;,
+      &quot;year_of_construction&quot;: &quot;2024&quot;,
+      &quot;country_of_origin&quot;: &quot;US&quot;,
+      &quot;asset&quot;: &quot;chem:asset:e2la0140bkr1&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;e2la0140bkr1&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/evaporator/e2la0140bkr1&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;motor&quot;,
+      &quot;description&quot;: &quot;Motor&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;motor&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/motor&quot;,
+      &quot;uns_level&quot;: &quot;machine&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;ECM1420&quot;,
+      &quot;description&quot;: &quot;Master-Bilt ECM1420&quot;,
+      &quot;manufacturer&quot;: &quot;Master-Bilt&quot;,
+      &quot;model&quot;: &quot;ECM1420&quot;,
+      &quot;product&quot;: &quot;ECM1420&quot;,
+      &quot;order_code&quot;: &quot;ECM1420&quot;,
+      &quot;serial&quot;: &quot;MS204190710&quot;,
+      &quot;asset_class&quot;: &quot;Motor&quot;,
+      &quot;asset&quot;: &quot;chem:asset:ecm1420&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;ecm1420&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/motor/ecm1420&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;conveyor&quot;,
+      &quot;description&quot;: &quot;Conveyor&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;conveyor&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/conveyor&quot;,
+      &quot;uns_level&quot;: &quot;machine&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;CV-001&quot;,
+      &quot;description&quot;: &quot;CV-001&quot;,
+      &quot;manufacturer&quot;: &quot;Hartwell&quot;,
+      &quot;model&quot;: &quot;CV-001&quot;,
+      &quot;product&quot;: &quot;CV-001&quot;,
+      &quot;order_code&quot;: &quot;CV-001&quot;,
+      &quot;serial&quot;: &quot;CV204190711&quot;,
+      &quot;asset_class&quot;: &quot;Conveyor&quot;,
+      &quot;asset&quot;: &quot;chem:asset:cv-001&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;cv-001&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/conveyor/cv-001&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;cell2&quot;,
+      &quot;description&quot;: &quot;Cell2&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;cell2&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell2&quot;,
+      &quot;uns_level&quot;: &quot;cell&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;transmitter&quot;,
+      &quot;description&quot;: &quot;Transmitter&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;transmitter&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell2/transmitter&quot;,
+      &quot;uns_level&quot;: &quot;machine&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;2TT-004&quot;,
+      &quot;description&quot;: &quot;2TT-004&quot;,
+      &quot;manufacturer&quot;: &quot;Hartwell&quot;,
+      &quot;model&quot;: &quot;2TT-004&quot;,
+      &quot;product&quot;: &quot;2TT-004&quot;,
+      &quot;order_code&quot;: &quot;2TT-004&quot;,
+      &quot;serial&quot;: &quot;TT204190712&quot;,
+      &quot;asset_class&quot;: &quot;Transmitter&quot;,
+      &quot;asset&quot;: &quot;chem:asset:2tt-004&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;2tt-004&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell2/transmitter/2tt-004&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;valve&quot;,
+      &quot;description&quot;: &quot;Valve&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;valve&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell2/valve&quot;,
+      &quot;uns_level&quot;: &quot;machine&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;FCV-C1&quot;,
+      &quot;description&quot;: &quot;FCV-C1&quot;,
+      &quot;manufacturer&quot;: &quot;Hartwell&quot;,
+      &quot;model&quot;: &quot;FCV-C1&quot;,
+      &quot;product&quot;: &quot;FCV-C1&quot;,
+      &quot;order_code&quot;: &quot;FCV-C1&quot;,
+      &quot;serial&quot;: &quot;FV204190713&quot;,
+      &quot;asset_class&quot;: &quot;Valve&quot;,
+      &quot;asset&quot;: &quot;chem:asset:fcv-c1&quot;
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;fcv-c1&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell2/valve/fcv-c1&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;temperature&quot;,
+      &quot;description&quot;: &quot;Temperature at the evaporator coil&quot;,
+      &quot;semantic_meaning&quot;: &quot;EvaporatorTemperature&quot;,
+      &quot;semantic_id&quot;: &quot;http://qudt.org/vocab/quantitykind/Temperature&quot;,
+      <b>&quot;value_type&quot;: &quot;xs:double&quot;,</b>
+      &quot;unit&quot;: &quot;degreeCelsius&quot;,
+      &quot;manufacturer&quot;: &quot;Master-Bilt&quot;,
+      &quot;product_root&quot;: &quot;Split-Pak&quot;,
+      &quot;product_family&quot;: &quot;Evaporator Coil&quot;,
+      &quot;model&quot;: &quot;E2LA0140BKR1&quot;,
+      &quot;serial&quot;: &quot;NL204190709&quot;,
+      &quot;asset_class&quot;: &quot;RefrigerationUnit&quot;,
+      &quot;opcua_node_id&quot;: &quot;ns=2;s=Controller1.Path1.Execution.Temperature&quot;,
+      &quot;signal_id&quot;: &quot;d16ae4fe5da3&quot;,
+      <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+      <b>&quot;table&quot;: &quot;evaporator_e2la0140bkr1_temperature&quot;,</b>
+      <b>&quot;column&quot;: &quot;value&quot;</b>
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;temperature&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/evaporator/e2la0140bkr1/temperature&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;state&quot;,
+      &quot;description&quot;: &quot;KE2 controller execution state&quot;,
+      &quot;semantic_meaning&quot;: &quot;ExecutionState&quot;,
+      <b>&quot;value_type&quot;: &quot;xs:string&quot;,</b>
+      &quot;states&quot;: &quot;Running,Stopped,Defrost,Alarm&quot;,
+      &quot;manufacturer&quot;: &quot;Master-Bilt&quot;,
+      &quot;product_root&quot;: &quot;Split-Pak&quot;,
+      &quot;product_family&quot;: &quot;Evaporator Coil&quot;,
+      &quot;model&quot;: &quot;E2LA0140BKR1&quot;,
+      &quot;serial&quot;: &quot;NL204190709&quot;,
+      &quot;asset_class&quot;: &quot;RefrigerationUnit&quot;,
+      &quot;opcua_node_id&quot;: &quot;ns=2;s=Controller1.Path1.Execution.State&quot;,
+      &quot;signal_id&quot;: &quot;2fa9df6a94fc&quot;,
+      <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+      <b>&quot;table&quot;: &quot;evaporator_e2la0140bkr1_state&quot;,</b>
+      <b>&quot;column&quot;: &quot;value&quot;</b>
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;state&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/evaporator/e2la0140bkr1/state&quot;
+    }
+  },
+</pre>
+<pre class="obj">  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;speed&quot;,
+      &quot;description&quot;: &quot;Evaporator fan motor&quot;,
+      <b>&quot;semantic_meaning&quot;: &quot;MotorSpeed&quot;,</b>
+      <b>&quot;semantic_id&quot;: &quot;http://qudt.org/vocab/quantitykind/AngularVelocity&quot;,</b>
+      <b>&quot;value_type&quot;: &quot;xs:double&quot;,</b>
+      &quot;unit&quot;: &quot;rpm&quot;,
+      &quot;manufacturer&quot;: &quot;Master-Bilt&quot;,
+      &quot;model&quot;: &quot;ECM1420&quot;,
+      &quot;serial&quot;: &quot;MS204190710&quot;,
+      &quot;asset_class&quot;: &quot;Motor&quot;,
+      &quot;signal_id&quot;: &quot;838a432156eb&quot;,
+      <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+      <b>&quot;table&quot;: &quot;dnp3_ecm1420&quot;,</b>
+      <b>&quot;column&quot;: &quot;speed&quot;</b>
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;speed&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/motor/ecm1420/speed&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;voltage_l1&quot;,
+      &quot;description&quot;: &quot;Line voltage.&quot;,
+      <b>&quot;semantic_meaning&quot;: &quot;VoltageL1&quot;,</b>
+      <b>&quot;semantic_id&quot;: &quot;http://qudt.org/vocab/quantitykind/Voltage&quot;,</b>
+      <b>&quot;value_type&quot;: &quot;xs:double&quot;,</b>
+      &quot;unit&quot;: &quot;V&quot;,
+      &quot;manufacturer&quot;: &quot;Master-Bilt&quot;,
+      &quot;model&quot;: &quot;ECM1420&quot;,
+      &quot;serial&quot;: &quot;MS204190710&quot;,
+      &quot;asset_class&quot;: &quot;Motor&quot;,
+      <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+      <b>&quot;table&quot;: &quot;dnp3_ecm1420&quot;,</b>
+      <b>&quot;column&quot;: &quot;voltage_l1&quot;</b>
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;voltage_l1&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/motor/ecm1420/voltage_l1&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;current_l1&quot;,
+      &quot;description&quot;: &quot;Line current.&quot;,
+      <b>&quot;semantic_meaning&quot;: &quot;CurrentL1&quot;,</b>
+      <b>&quot;semantic_id&quot;: &quot;http://qudt.org/vocab/quantitykind/ElectricCurrent&quot;,</b>
+      <b>&quot;value_type&quot;: &quot;xs:double&quot;,</b>
+      &quot;unit&quot;: &quot;A&quot;,
+      &quot;manufacturer&quot;: &quot;Master-Bilt&quot;,
+      &quot;model&quot;: &quot;ECM1420&quot;,
+      &quot;serial&quot;: &quot;MS204190710&quot;,
+      &quot;asset_class&quot;: &quot;Motor&quot;,
+      <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+      <b>&quot;table&quot;: &quot;dnp3_ecm1420&quot;,</b>
+      <b>&quot;column&quot;: &quot;current_l1&quot;</b>
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;current_l1&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/motor/ecm1420/current_l1&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;active_power_kw&quot;,
+      &quot;description&quot;: &quot;Active power.&quot;,
+      <b>&quot;semantic_meaning&quot;: &quot;ActivePower&quot;,</b>
+      <b>&quot;semantic_id&quot;: &quot;http://qudt.org/vocab/quantitykind/ActivePower&quot;,</b>
+      <b>&quot;value_type&quot;: &quot;xs:double&quot;,</b>
+      &quot;unit&quot;: &quot;kW&quot;,
+      &quot;manufacturer&quot;: &quot;Master-Bilt&quot;,
+      &quot;model&quot;: &quot;ECM1420&quot;,
+      &quot;serial&quot;: &quot;MS204190710&quot;,
+      &quot;asset_class&quot;: &quot;Motor&quot;,
+      <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+      <b>&quot;table&quot;: &quot;dnp3_ecm1420&quot;,</b>
+      <b>&quot;column&quot;: &quot;active_power_kw&quot;</b>
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;active_power_kw&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/motor/ecm1420/active_power_kw&quot;
+    }
+  }</pre>
+<pre>  ,
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;running&quot;,
+      &quot;description&quot;: &quot;Distinguishes whether the Conveyor is in run mode&quot;,
+      &quot;semantic_meaning&quot;: &quot;Running&quot;,
+      <b>&quot;value_type&quot;: &quot;xs:boolean&quot;,</b>
+      &quot;manufacturer&quot;: &quot;Hartwell&quot;,
+      &quot;model&quot;: &quot;CV-001&quot;,
+      &quot;serial&quot;: &quot;CV204190711&quot;,
+      &quot;asset_class&quot;: &quot;Conveyor&quot;,
+      &quot;signal_id&quot;: &quot;da2f2acb87a8&quot;,
+      <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+      <b>&quot;table&quot;: &quot;conveyor_cv_001_running&quot;,</b>
+      <b>&quot;column&quot;: &quot;value&quot;</b>
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;running&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/conveyor/cv-001/running&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;speed&quot;,
+      &quot;description&quot;: &quot;Conveyor speed&quot;,
+      &quot;semantic_meaning&quot;: &quot;Speed&quot;,
+      &quot;semantic_id&quot;: &quot;http://qudt.org/vocab/quantitykind/Speed&quot;,
+      <b>&quot;value_type&quot;: &quot;xs:double&quot;,</b>
+      &quot;manufacturer&quot;: &quot;Hartwell&quot;,
+      &quot;model&quot;: &quot;CV-001&quot;,
+      &quot;serial&quot;: &quot;CV204190711&quot;,
+      &quot;asset_class&quot;: &quot;Conveyor&quot;,
+      &quot;signal_id&quot;: &quot;4b2789acd05b&quot;,
+      <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+      <b>&quot;table&quot;: &quot;conveyor_cv_001_speed&quot;,</b>
+      <b>&quot;column&quot;: &quot;value&quot;</b>
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;speed&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/conveyor/cv-001/speed&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;direction&quot;,
+      &quot;description&quot;: &quot;Direction of product on conveyor belt&quot;,
+      &quot;semantic_meaning&quot;: &quot;Direction&quot;,
+      <b>&quot;value_type&quot;: &quot;xs:string&quot;,</b>
+      &quot;manufacturer&quot;: &quot;Hartwell&quot;,
+      &quot;model&quot;: &quot;CV-001&quot;,
+      &quot;serial&quot;: &quot;CV204190711&quot;,
+      &quot;asset_class&quot;: &quot;Conveyor&quot;,
+      &quot;signal_id&quot;: &quot;9ac8ec0bd0eb&quot;,
+      <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+      <b>&quot;table&quot;: &quot;conveyor_cv_001_direction&quot;,</b>
+      <b>&quot;column&quot;: &quot;value&quot;</b>
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;direction&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell1/conveyor/cv-001/direction&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;temperature&quot;,
+      &quot;description&quot;: &quot;2TT-004 Value (Temperature)&quot;,
+      &quot;semantic_meaning&quot;: &quot;Temperature&quot;,
+      &quot;semantic_id&quot;: &quot;http://qudt.org/vocab/quantitykind/Temperature&quot;,
+      <b>&quot;value_type&quot;: &quot;xs:double&quot;,</b>
+      &quot;manufacturer&quot;: &quot;Hartwell&quot;,
+      &quot;model&quot;: &quot;2TT-004&quot;,
+      &quot;serial&quot;: &quot;TT204190712&quot;,
+      &quot;asset_class&quot;: &quot;Transmitter&quot;,
+      &quot;signal_id&quot;: &quot;0b474508cab8&quot;,
+      &quot;path&quot;: &quot;APP1_MadePC200_UNIT_202_EM_D204_EM_D204_FieldInterface.AI_2TT004.IThis.AIFiltered&quot;,
+      &quot;data_object_name&quot;: &quot;2TT-004&quot;,
+      &quot;data_object_field&quot;: &quot;Value&quot;,
+      &quot;display_tag&quot;: &quot;2TT-004&quot;,
+      &quot;display_field&quot;: &quot;Value&quot;,
+      &quot;process_cell&quot;: &quot;PC200&quot;,
+      &quot;unit_code&quot;: &quot;UNIT-202&quot;,
+      &quot;equipment_module&quot;: &quot;EM-D204&quot;,
+      &quot;physical_property&quot;: &quot;Temperature&quot;,
+      <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+      <b>&quot;table&quot;: &quot;transmitter_2tt_004_temperature&quot;,</b>
+      <b>&quot;column&quot;: &quot;value&quot;</b>
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;temperature&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell2/transmitter/2tt-004/temperature&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;limit&quot;,
+      &quot;description&quot;: &quot;2TT-004 LimitH (Temperature)&quot;,
+      &quot;semantic_meaning&quot;: &quot;Temperature&quot;,
+      <b>&quot;value_type&quot;: &quot;xs:boolean&quot;,</b>
+      &quot;manufacturer&quot;: &quot;Hartwell&quot;,
+      &quot;model&quot;: &quot;2TT-004&quot;,
+      &quot;serial&quot;: &quot;TT204190712&quot;,
+      &quot;asset_class&quot;: &quot;Transmitter&quot;,
+      &quot;signal_id&quot;: &quot;b236db1b082f&quot;,
+      &quot;data_object_name&quot;: &quot;2TT-004&quot;,
+      &quot;data_object_field&quot;: &quot;LimitH&quot;,
+      &quot;display_tag&quot;: &quot;2TT-004&quot;,
+      &quot;display_field&quot;: &quot;LimitH&quot;,
+      &quot;process_cell&quot;: &quot;PC200&quot;,
+      &quot;unit_code&quot;: &quot;UNIT-202&quot;,
+      &quot;equipment_module&quot;: &quot;EM-D204&quot;,
+      &quot;physical_property&quot;: &quot;Temperature&quot;,
+      <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+      <b>&quot;table&quot;: &quot;transmitter_2tt_004_limit&quot;,</b>
+      <b>&quot;column&quot;: &quot;value&quot;</b>
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;limit&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell2/transmitter/2tt-004/limit&quot;
+    }
+  },
+  {
+    &quot;object&quot;: {
+      &quot;name&quot;: &quot;position&quot;,
+      &quot;description&quot;: &quot;FCV-C1 InternalAO-PosSP (ValvePosition)&quot;,
+      &quot;semantic_meaning&quot;: &quot;ValvePosition&quot;,
+      <b>&quot;value_type&quot;: &quot;xs:double&quot;,</b>
+      &quot;manufacturer&quot;: &quot;Hartwell&quot;,
+      &quot;model&quot;: &quot;FCV-C1&quot;,
+      &quot;serial&quot;: &quot;FV204190713&quot;,
+      &quot;asset_class&quot;: &quot;Valve&quot;,
+      &quot;signal_id&quot;: &quot;8f0cfa26e88f&quot;,
+      &quot;path&quot;: &quot;APP1_MadePC600_UNIT_601_EM_C1_FCVC1.Fieldinterface.PosSP.IThis.AOScaled&quot;,
+      &quot;data_object_name&quot;: &quot;FCV-C1&quot;,
+      &quot;data_object_field&quot;: &quot;InternalAO-PosSP&quot;,
+      &quot;display_tag&quot;: &quot;FCV-C1&quot;,
+      &quot;display_field&quot;: &quot;InternalAO-PosSP&quot;,
+      &quot;process_cell&quot;: &quot;PC600&quot;,
+      &quot;unit_code&quot;: &quot;UNIT-601&quot;,
+      &quot;equipment_module&quot;: &quot;EM-C1&quot;,
+      &quot;physical_property&quot;: &quot;ValvePosition&quot;,
+      <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+      <b>&quot;table&quot;: &quot;valve_fcv_c1_position&quot;,</b>
+      <b>&quot;column&quot;: &quot;value&quot;</b>
+    },
+    &quot;uns&quot;: {
+      &quot;name&quot;: &quot;position&quot;,
+      &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell2/valve/fcv-c1/position&quot;
+    }
+  }
+]</pre>
+      <p>Instead of setting a named table, we can also build the objects reflecting the way that is ingested.</p>
+      <p>Four tables: real, int, bool, strings.<br>
+      The column is value.<br>
+      This object is the real table, values_double.</p>
+      <pre>{
+  &quot;name&quot;: &quot;position&quot;,
+  &quot;description&quot;: &quot;FCV-C1 InternalAO-PosSP (ValvePosition)&quot;,
+  &quot;semantic_meaning&quot;: &quot;ValvePosition&quot;,
+  <b>&quot;value_type&quot;: &quot;xs:double&quot;,</b>
+  &quot;manufacturer&quot;: &quot;Hartwell&quot;,
+  &quot;model&quot;: &quot;FCV-C1&quot;,
+  &quot;serial&quot;: &quot;FV204190713&quot;,
+  &quot;asset_class&quot;: &quot;Valve&quot;,
+  &quot;signal_id&quot;: &quot;8f0cfa26e88f&quot;,
+  &quot;path&quot;: &quot;APP1_MadePC600_UNIT_601_EM_C1_FCVC1.Fieldinterface.PosSP.IThis.AOScaled&quot;,
+  &quot;data_object_name&quot;: &quot;FCV-C1&quot;,
+  &quot;data_object_field&quot;: &quot;InternalAO-PosSP&quot;,
+  &quot;display_tag&quot;: &quot;FCV-C1&quot;,
+  &quot;display_field&quot;: &quot;InternalAO-PosSP&quot;,
+  &quot;process_cell&quot;: &quot;PC600&quot;,
+  &quot;unit_code&quot;: &quot;UNIT-601&quot;,
+  &quot;equipment_module&quot;: &quot;EM-C1&quot;,
+  &quot;physical_property&quot;: &quot;ValvePosition&quot;,
+  <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+  <b>&quot;table&quot;: &quot;values_double&quot;,</b>
+  <b>&quot;column&quot;: &quot;value&quot;,</b>
+  <b>&quot;where&quot;: &quot;signal_id=8f0cfa26e88f&quot;</b>
+}</pre>
+      <p>One table, chem_values. The column is value_real.</p>
+      <pre>{
+  &quot;name&quot;: &quot;position&quot;,
+  &quot;description&quot;: &quot;FCV-C1 InternalAO-PosSP (ValvePosition)&quot;,
+  &quot;semantic_meaning&quot;: &quot;ValvePosition&quot;,
+  <b>&quot;value_type&quot;: &quot;xs:double&quot;,</b>
+  &quot;manufacturer&quot;: &quot;Hartwell&quot;,
+  &quot;model&quot;: &quot;FCV-C1&quot;,
+  &quot;serial&quot;: &quot;FV204190713&quot;,
+  &quot;asset_class&quot;: &quot;Valve&quot;,
+  &quot;signal_id&quot;: &quot;8f0cfa26e88f&quot;,
+  &quot;path&quot;: &quot;APP1_MadePC600_UNIT_601_EM_C1_FCVC1.Fieldinterface.PosSP.IThis.AOScaled&quot;,
+  &quot;data_object_name&quot;: &quot;FCV-C1&quot;,
+  &quot;data_object_field&quot;: &quot;InternalAO-PosSP&quot;,
+  &quot;display_tag&quot;: &quot;FCV-C1&quot;,
+  &quot;display_field&quot;: &quot;InternalAO-PosSP&quot;,
+  &quot;process_cell&quot;: &quot;PC600&quot;,
+  &quot;unit_code&quot;: &quot;UNIT-601&quot;,
+  &quot;equipment_module&quot;: &quot;EM-C1&quot;,
+  &quot;physical_property&quot;: &quot;ValvePosition&quot;,
+  <b>&quot;dbms&quot;: &quot;env_sensor&quot;,</b>
+  <b>&quot;table&quot;: &quot;chem_values&quot;,</b>
+  <b>&quot;column&quot;: &quot;value_real&quot;</b>
+}</pre>
+      <h3 id="data-ingestion">Possible paths for data ingestions</h3>
+      <p>If the table does not exist, the AnyLog operator creates it from the first received row.</p>
+      <h3>1) REST API ingestion</h3>
+      <p>1.1 A row into the named table.</p>
+      <pre>curl -X PUT http://192.168.1.70:32149 \
+  -H 'User-Agent: AnyLog/1.23' \
+  -H 'dbms: env_sensor' \
+  -H 'table: valve_fcv_c1_position' \
+  -H 'mode: streaming' \
+  -H 'Content-Type: application/json' \
+  -d '[{"timestamp":"2026-10-07T16:00:00.000000Z","value":25.0}]'</pre>
+      <pre>AL anylog-standalone-operator +&gt; get columns where table = valve_fcv_c1_position and dbms = env_sensor
+
+Schema for DBMS: 'env_sensor' and Table: 'valve_fcv_c1_position'
+Column Name      Column Type
+----------------|---------------------------|
+row_id          |integer                    |
+insert_timestamp|timestamp without time zone|
+tsd_name        |char(3)                    |
+tsd_id          |int                        |
+timestamp       |timestamp without time zone|
+value           |decimal                    |</pre>
+      <p>1.2 A row into a common table, passing signal_id.<br>
+      Four tables: real, int, bool, strings.<br>
+      This row is a real. The table is values_double.</p>
+      <pre>curl -X PUT http://192.168.1.70:32149 \
+  -H 'User-Agent: AnyLog/1.23' \
+  -H 'dbms: env_sensor' \
+  -H 'table: values_double' \
+  -H 'mode: streaming' \
+  -H 'Content-Type: application/json' \
+  -d '[{"timestamp":"2026-10-07T16:00:00.000000Z","signal_id":"8f0cfa26e88f","value":25.0}]'</pre>
+      <pre>AL anylog-standalone-operator +&gt; get columns where table = values_double and dbms = env_sensor
+
+Schema for DBMS: 'env_sensor' and Table: 'values_double'
+Column Name      Column Type
+----------------|---------------------------|
+row_id          |integer                    |
+insert_timestamp|timestamp without time zone|
+tsd_name        |char(3)                    |
+tsd_id          |int                        |
+timestamp       |timestamp without time zone|
+signal_id       |character varying          |
+value           |decimal                    |</pre>
+      <p>1.3 One table, chem_values. Every reading goes there.<br>
+      The object column names the column that holds the reading.</p>
+      <pre>AL anylog-standalone-operator +&gt; get columns where table = chem_values and dbms = env_sensor
+
+Schema for DBMS: 'env_sensor' and Table: 'chem_values'
+Column Name      Column Type
+----------------|---------------------------|
+row_id          |integer                    |
+insert_timestamp|timestamp without time zone|
+tsd_name        |char(3)                    |
+tsd_id          |int                        |
+timestamp       |timestamp without time zone|
+signal_id       |character varying          |
+name            |char(5)                    |
+value_real      |decimal                    |
+value_int       |integer                    |
+value_bool      |int                        |
+value_string    |character varying          |</pre>
+      <p>fcv-c1 position.</p>
+      <pre>curl -X PUT http://192.168.1.70:32149 \
+  -H 'User-Agent: AnyLog/1.23' \
+  -H 'dbms: env_sensor' \
+  -H 'table: chem_values' \
+  -H 'mode: streaming' \
+  -H 'Content-Type: application/json' \
+  -d '[{"timestamp":"2026-10-07T16:00:00.000000Z","signal_id":"8f0cfa26e88f","value_real":25.0}]'</pre>
+      <pre>{
+  "signal_id": "8f0cfa26e88f",
+  <b>"dbms": "env_sensor",</b>
+  <b>"table": "chem_values",</b>
+  <b>"column": "value_real"</b>
+}</pre>
+      <p>2TT-004 value.</p>
+      <pre>curl -X PUT http://192.168.1.70:32149 \
+  -H 'User-Agent: AnyLog/1.23' \
+  -H 'dbms: env_sensor' \
+  -H 'table: chem_values' \
+  -H 'mode: streaming' \
+  -H 'Content-Type: application/json' \
+  -d '[{"timestamp":"2026-10-07T16:00:00.000000Z","signal_id":"0b474508cab8","value_real":22.5}]'</pre>
+      <pre>{
+  "signal_id": "0b474508cab8",
+  <b>"dbms": "env_sensor",</b>
+  <b>"table": "chem_values",</b>
+  <b>"column": "value_real"</b>
+}</pre>
+      <p>evaporator state.</p>
+      <pre>curl -X PUT http://192.168.1.70:32149 \
+  -H 'User-Agent: AnyLog/1.23' \
+  -H 'dbms: env_sensor' \
+  -H 'table: chem_values' \
+  -H 'mode: streaming' \
+  -H 'Content-Type: application/json' \
+  -d '[{"timestamp":"2026-10-07T16:00:00.000000Z","signal_id":"2fa9df6a94fc","value_string":"Running"}]'</pre>
+      <pre>{
+  "signal_id": "2fa9df6a94fc",
+  <b>"dbms": "env_sensor",</b>
+  <b>"table": "chem_values",</b>
+  <b>"column": "value_string"</b>
+}</pre>
+      <h3>2) MQTT ingestion</h3>
+      <p>The leaf is AAS/chemblast/plant1/reaction/cell2/valve/fcv-c1/position.</p>
+      <p>2.1 A row into the named table.</p>
+      <pre>run msg client where broker = local and log = false and topic = (
+  name = "AAS/chemblast/plant1/reaction/cell2/valve/fcv-c1/position" and
+  dbms = env_sensor and
+  table = valve_fcv_c1_position and
+  column.timestamp.timestamp = "bring [timestamp]" and
+  column.value.float = "bring [value]"
+)</pre>
+      <p>fcv-c1 position.</p>
+      <pre>mosquitto_pub -h 192.168.1.70 -p 32150 -t 'AAS/chemblast/plant1/reaction/cell2/valve/fcv-c1/position' \
+  -m '{"timestamp":"2026-10-07T16:00:00.000000Z","value":25.0}'</pre>
+      <p>2TT-004 value.</p>
+      <pre>run msg client where broker = local and log = false and topic = (
+  name = "AAS/chemblast/plant1/reaction/cell2/transmitter/2tt-004/temperature" and
+  dbms = env_sensor and
+  table = transmitter_2tt_004_temperature and
+  column.timestamp.timestamp = "bring [timestamp]" and
+  column.value.float = "bring [value]"
+)</pre>
+      <pre>mosquitto_pub -h 192.168.1.70 -p 32150 -t 'AAS/chemblast/plant1/reaction/cell2/transmitter/2tt-004/temperature' \
+  -m '{"timestamp":"2026-10-07T16:00:00.000000Z","value":22.5}'</pre>
+      <p>2.2 A row into a common table, passing signal_id.<br>
+      Four tables: real, int, bool, strings.<br>
+      The sent topic is the leaf.<br>
+      This subscription is the real table, values_double.</p>
+      <pre>run msg client where broker = local and log = false and topic = (
+  name = "AAS/chemblast/#" and
+  dbms = env_sensor and
+  table = values_double and
+  column.timestamp.timestamp = "bring [timestamp]" and
+  column.signal_id.string = "bring [signal_id]" and
+  column.value.float = "bring [value]"
+)</pre>
+      <p>fcv-c1 position.</p>
+      <pre>mosquitto_pub -h 192.168.1.70 -p 32150 -t 'AAS/chemblast/plant1/reaction/cell2/valve/fcv-c1/position' \
+  -m '{"timestamp":"2026-10-07T16:00:00.000000Z","signal_id":"8f0cfa26e88f","value":25.0}'</pre>
+      <p>2TT-004 value.</p>
+      <pre>mosquitto_pub -h 192.168.1.70 -p 32150 -t 'AAS/chemblast/plant1/reaction/cell2/transmitter/2tt-004/temperature' \
+  -m '{"timestamp":"2026-10-07T16:00:00.000000Z","signal_id":"0b474508cab8","value":22.5}'</pre>
+      <p>2.3 One table, chem_values. Every reading goes there.<br>
+      The sent topic is the leaf.<br>
+      The local broker listens on AAS/chemblast/# and writes every leaf to chem_values.</p>
+      <pre>run msg client where broker = local and log = false and topic = (
+  name = "AAS/chemblast/#" and
+  dbms = env_sensor and
+  table = chem_values and
+  column.timestamp.timestamp = "bring [timestamp]" and
+  column.signal_id.string = "bring [signal_id]" and
+  column.value_real.float = "bring [value_real]" and
+  column.value_int.int = "bring [value_int]" and
+  column.value_bool.bool = "bring [value_bool]" and
+  column.value_string.string = "bring [value_string]"
+)</pre>
+      <p>fcv-c1 position.</p>
+      <pre>mosquitto_pub -h 192.168.1.70 -p 32150 -t 'AAS/chemblast/plant1/reaction/cell2/valve/fcv-c1/position' \
+  -m '{"timestamp":"2026-10-07T16:00:00.000000Z","signal_id":"8f0cfa26e88f","value_real":25.0}'</pre>
+      <p>2TT-004 value.</p>
+      <pre>mosquitto_pub -h 192.168.1.70 -p 32150 -t 'AAS/chemblast/plant1/reaction/cell2/transmitter/2tt-004/temperature' \
+  -m '{"timestamp":"2026-10-07T16:00:00.000000Z","signal_id":"0b474508cab8","value_real":22.5}'</pre>
+      <pre>{
+  "signal_id": "0b474508cab8",
+  <b>"dbms": "env_sensor",</b>
+  <b>"table": "chem_values",</b>
+  <b>"column": "value_real"</b>
+}</pre>
+      <p>evaporator state.</p>
+      <pre>mosquitto_pub -h 192.168.1.70 -p 32150 -t 'AAS/chemblast/plant1/reaction/cell1/evaporator/e2la0140bkr1/state' \
+  -m '{"timestamp":"2026-10-07T16:00:00.000000Z","signal_id":"2fa9df6a94fc","value_string":"Running"}'</pre>
+      <pre>{
+  "signal_id": "2fa9df6a94fc",
+  <b>"dbms": "env_sensor",</b>
+  <b>"table": "chem_values",</b>
+  <b>"column": "value_string"</b>
+}</pre>
+      <h3>3) OPC UA</h3>
+      <p>The interface is on E2LA0140BKR1.<br>
+      opc.tcp://10.0.0.111:53530/<br>
+      The node is ns=2;s=Controller1.Path1.Execution.Temperature.<br>
+      If possible, use this interface.<br>
+      Otherwise we create run plc client with the customer information.<br>
+      The reading is the evaporator temperature.<br>
+      The PLC client cannot pass signal_id.<br>
+      The table is the signal.<br>
+      The named table is evaporator_e2la0140bkr1_temperature. The column is value.</p>
+      <pre>{"timestamp":"2026-10-07T16:00:00.000000Z","value":18.0}</pre>
+      <pre>{
+  <b>"dbms": "env_sensor",</b>
+  <b>"table": "evaporator_e2la0140bkr1_temperature",</b>
+  <b>"column": "value"</b>
+}</pre>
+      <pre>run plc client where type = opcua and
+  url = opc.tcp://10.0.0.111:53530/ and
+  frequency = 20 and
+  dbms = env_sensor and
+  table = evaporator_e2la0140bkr1_temperature and
+  node = "ns=2;s=Controller1.Path1.Execution.Temperature"</pre>
+      <p>Second example. opc.tcp://192.168.1.70:53530/OPCUA/SimulationServer.<br>
+      The node is ns=3;i=1002. The column read is random.<br>
+      The policy writes it as value and sets signal_id d16ae4fe5da3.<br>
+      The table is values_double.</p>
+      <pre>{
+  "mapping": {
+    "id": "opcua-random-map",
+    <b>"dbms": "env_sensor",</b>
+    <b>"table": "values_double",</b>
+    "schema": {
+      "timestamp": {"type": "timestamp", "bring": "[timestamp]"},
+      "signal_id": {"type": "string", "default": "d16ae4fe5da3"},
+      "value": {"type": "float", "bring": "[random]"}
+    }
+  }
+}</pre>
+      <pre>run plc client where type = opcua and
+  url = opc.tcp://192.168.1.70:53530/OPCUA/SimulationServer and
+  frequency = 5 and
+  name = opcua_random_try and
+  dbms = env_sensor and
+  table = values_double and
+  policy = opcua-random-map and
+  node = "ns=3;i=1002"</pre>
+      <h3>4) DNP3 and Modbus</h3>
+      <h4>a) DNP3</h4>
+      <p>127.0.0.1:20000. Master 1. Outstation 10.<br>
+      The table is dnp3_ecm1420.<br>
+      One row has the four columns. Each object names one column.</p>
+      <pre>run plc client where type = dnp3 and
+  hostname = 127.0.0.1 and
+  port = 20000 and
+  master_id = 1 and
+  outstation_id = 10 and
+  frequency = 5 and
+  name = dnp3_ecm1420 and
+  dbms = env_sensor and
+  table = dnp3_ecm1420 and
+  map = [
+    {"name":"voltage_l1","type":"Analog","index":0},
+    {"name":"current_l1","type":"Analog","index":1},
+    {"name":"active_power_kw","type":"Analog","index":6},
+    {"name":"speed","type":"Analog","index":30}
+  ]</pre>
+      <pre>AL anylog-standalone-operator +&gt; get columns where table = dnp3_ecm1420 and dbms = env_sensor
+
+Schema for DBMS: 'env_sensor' and Table: 'dnp3_ecm1420'
+Column Name      Column Type
+----------------|---------------------------|
+row_id          |integer                    |
+insert_timestamp|timestamp without time zone|
+tsd_name        |char(3)                    |
+tsd_id          |int                        |
+timestamp       |timestamp without time zone|
+duration        |int                        |
+voltage_l1      |decimal                    |
+current_l1      |decimal                    |
+active_power_kw |decimal                    |
+speed           |decimal                    |</pre>
+      <pre class="obj">{
+  "name": "voltage_l1",
+  "description": "Line voltage.",
+  <b>"semantic_meaning": "VoltageL1",</b>
+  <b>"semantic_id": "http://qudt.org/vocab/quantitykind/Voltage",</b>
+  <b>"value_type": "xs:double",</b>
+  "unit": "V",
+  "manufacturer": "Master-Bilt",
+  "model": "ECM1420",
+  "serial": "MS204190710",
+  "asset_class": "Motor",
+  <b>"dbms": "env_sensor",</b>
+  <b>"table": "dnp3_ecm1420",</b>
+  <b>"column": "voltage_l1",</b>
+  "id": "143575cf4c7831b73f84a8164e74c9be",
+  "date": "2026-10-08T14:26:22.579872Z"
+}</pre>
+      <pre class="obj">{
+  "name": "current_l1",
+  "description": "Line current.",
+  <b>"semantic_meaning": "CurrentL1",</b>
+  <b>"semantic_id": "http://qudt.org/vocab/quantitykind/ElectricCurrent",</b>
+  <b>"value_type": "xs:double",</b>
+  "unit": "A",
+  "manufacturer": "Master-Bilt",
+  "model": "ECM1420",
+  "serial": "MS204190710",
+  "asset_class": "Motor",
+  <b>"dbms": "env_sensor",</b>
+  <b>"table": "dnp3_ecm1420",</b>
+  <b>"column": "current_l1",</b>
+  "id": "87f62d6ab0ff673349f4a2342e99b8e5",
+  "date": "2026-10-08T14:26:22.561653Z"
+}</pre>
+      <pre class="obj">{
+  "name": "active_power_kw",
+  "description": "Active power.",
+  <b>"semantic_meaning": "ActivePower",</b>
+  <b>"semantic_id": "http://qudt.org/vocab/quantitykind/ActivePower",</b>
+  <b>"value_type": "xs:double",</b>
+  "unit": "kW",
+  "manufacturer": "Master-Bilt",
+  "model": "ECM1420",
+  "serial": "MS204190710",
+  "asset_class": "Motor",
+  <b>"dbms": "env_sensor",</b>
+  <b>"table": "dnp3_ecm1420",</b>
+  <b>"column": "active_power_kw",</b>
+  "id": "ecb3205ebe0b144078e48758e481d5bd",
+  "date": "2026-10-08T14:26:22.603180Z"
+}</pre>
+      <pre class="obj">{
+  "name": "speed",
+  "description": "Evaporator fan motor",
+  <b>"semantic_meaning": "MotorSpeed",</b>
+  <b>"semantic_id": "http://qudt.org/vocab/quantitykind/AngularVelocity",</b>
+  "value_type": "xs:double",
+  "unit": "rpm",
+  "manufacturer": "Master-Bilt",
+  "model": "ECM1420",
+  "serial": "MS204190710",
+  "asset_class": "Motor",
+  "signal_id": "838a432156eb",
+  <b>"dbms": "env_sensor",</b>
+  <b>"table": "dnp3_ecm1420",</b>
+  <b>"column": "speed",</b>
+  "id": "a43bc3e866f5e651de0ce008e09bc8f9",
+  "date": "2026-10-08T14:26:22.638276Z"
+}</pre>
+      <h4>b) Modbus</h4>
+      <p>What we have done with DNP3 can be done with Modbus.<br>
+      The table is modbus_ecm1420.<br>
+      Possible config. 40089 is holding register offset 88.</p>
+      <pre>run plc client where type = modbus and
+  hostname = 192.168.99.159 and
+  port = 502 and
+  device_id = 1 and
+  frequency = 5 and
+  name = modbus_ecm1420 and
+  dbms = env_sensor and
+  table = modbus_ecm1420 and
+  map = [
+    {"name":"voltage_l1","register":0},
+    {"name":"current_l1","register":1},
+    {"name":"active_power_kw","register":[2,3],"type":"float"},
+    {"name":"speed","register":88}
+  ]</pre>
+      <h3>Enrich UNS policies with isa-95 and isa-88</h3>
+      <p>isa-95.</p>
+      <pre>{
+  &quot;name&quot;: &quot;position&quot;,
+  &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell2/valve/fcv-c1/position&quot;,
+  &quot;uns_level&quot;: &quot;tag&quot;,
+  &quot;isa95&quot;: {
+    &quot;level&quot;: &quot;L1&quot;,
+    &quot;entity&quot;: &quot;Field Device&quot;,
+    &quot;standard&quot;: &quot;ISA-95&quot;
+  }
+}</pre>
+      <p>isa-88.</p>
+      <pre>{
+  &quot;name&quot;: &quot;position&quot;,
+  &quot;namespace&quot;: &quot;chemblast/plant1/reaction/cell2/valve/fcv-c1/position&quot;,
+  &quot;uns_level&quot;: &quot;tag&quot;,
+  &quot;isa88&quot;: {
+    &quot;level&quot;: &quot;Control Module&quot;,
+    &quot;model&quot;: &quot;physical&quot;,
+    &quot;standard&quot;: &quot;ISA-88&quot;
+  }
+}</pre>
+    </div>
+
+    <h2 id="example-uns">Example UNS directly derived from AAS, for ecm1420</h2>
+
+    <p id="ecm1420">UNS path to ecm1420.</p>
+      <pre>chemblast
+ └── plant1
+      └── reaction
+           └── cell1
+                └── motor
+                     └── ecm1420
+                          ├── speed
+                          ├── voltage_l1
+                          ├── current_l1
+                          └── active_power_kw</pre>
+      <img src="UNS.png" alt="UNS path to ecm1420">
+      <p id="graphs">Data Graphs.</p>
+      <img src="GRAPH.png" alt="Data Graphs">
+
+    <h2 id="manufacturer">UNS path by "manufacturer" (AI assisted)</h2>
+    <pre>manufacturer
+ ├── master-bilt
+ │    ├── ecm1420
+ │    │    ├── speed
+ │    │    ├── voltage_l1
+ │    │    ├── current_l1
+ │    │    └── active_power_kw
+ │    └── e2la0140bkr1
+ │         ├── temperature
+ │         └── state
+ └── hartwell
+      ├── cv-001
+      │    ├── running
+      │    ├── speed
+      │    └── direction
+      ├── 2tt-004
+      │    ├── temperature
+      │    └── limit
+      └── fcv-c1
+           └── position</pre>
+
+    <h2 id="physical-property">UNS path by "physical property" (AI assisted)</h2>
+    <pre>physical-property
+ ├── temperature
+ │    ├── e2la0140bkr1
+ │    │    └── temperature
+ │    └── 2tt-004
+ │         ├── temperature
+ │         └── limit
+ ├── speed
+ │    ├── ecm1420
+ │    │    └── speed
+ │    └── cv-001
+ │         └── speed
+ ├── voltage
+ │    └── ecm1420
+ │         └── voltage_l1
+ ├── current
+ │    └── ecm1420
+ │         └── current_l1
+ ├── power
+ │    └── ecm1420
+ │         └── active_power_kw
+ ├── position
+ │    └── fcv-c1
+ │         └── position
+ ├── state
+ │    └── e2la0140bkr1
+ │         └── state
+ ├── running
+ │    └── cv-001
+ │         └── running
+ └── direction
+      └── cv-001
+           └── direction</pre>
+
+    <h2 id="asset-class">UNS path by "asset_class" (AI assisted)</h2>
+    <pre>asset_class
+ ├── Motor
+ │    └── ecm1420
+ │         ├── speed
+ │         ├── voltage_l1
+ │         ├── current_l1
+ │         └── active_power_kw
+ ├── RefrigerationUnit
+ │    └── e2la0140bkr1
+ │         ├── temperature
+ │         └── state
+ ├── Conveyor
+ │    └── cv-001
+ │         ├── running
+ │         ├── speed
+ │         └── direction
+ ├── Transmitter
+ │    └── 2tt-004
+ │         ├── temperature
+ │         └── limit
+ └── Valve
+      └── fcv-c1
+           └── position</pre>
+  </main>
+</body>
+</html>
